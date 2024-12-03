@@ -1,6 +1,8 @@
 import { database, auth } from './firebase'; // firebase.ts 초기화 파일
 import { ref, set, remove, onValue, get } from 'firebase/database';
 
+let isMatchProcessed = false; // 매칭 처리 여부를 나타내는 플래그
+
 // 현재 로그인한 사용자 ID 가져오기
 export const getCurrentUserId = (): string | null => {
   return auth.currentUser?.uid || null; // 로그인된 사용자의 UID 반환
@@ -54,32 +56,44 @@ export const leaveQueue = async (): Promise<void> => {
   }
 };
 
-
 // 대기열 데이터 수신 및 매칭 처리
 export const listenForQueueChanges = (
   userId: string,
   onMatchFound: (matchedUserId: string) => void
 ) => {
   const queueRef = ref(database, 'queue');
+  let isMatchProcessed = false; // 매칭 처리 여부
 
   // 대기열 데이터 변경 수신
   onValue(queueRef, async (snapshot) => {
+    if (isMatchProcessed) return; // 이미 매칭이 처리된 경우 반환
+
     const data = snapshot.val();
     if (data) {
-      // 대기열에서 매칭 가능한 사용자 검색 (내 ID 제외)
       const userIds = Object.keys(data);
-      const matchedUserId = userIds.find((id) => id !== userId); // 자신이 아닌 다른 사용자 검색
+
+      // 자신이 아닌 다른 사용자 검색
+      const matchedUserId = userIds.find((id) => id !== userId);
 
       if (matchedUserId) {
+        isMatchProcessed = true; // 매칭 처리 플래그 설정
         console.log(`Match found: ${userId} matched with ${matchedUserId}`);
 
-        // 매칭된 사용자 삭제
-        await leaveQueue(); // 본인 삭제
-        await remove(ref(database, `queue/${matchedUserId}`)); // 상대방 삭제
+        try {
+          // 매칭된 사용자 삭제
+          await leaveQueue(); // 본인 삭제
+          await remove(ref(database, `queue/${matchedUserId}`)); // 상대방 삭제
 
-        // 매칭 결과 전달
-        onMatchFound(matchedUserId);
+          // 매칭 결과 전달
+          onMatchFound(matchedUserId);
+        } catch (error) {
+          console.error('Error during match processing:', error);
+        }
+      } else {
+        console.log('No matching user found at this moment.');
       }
+    } else {
+      console.log('Queue is empty.');
     }
   });
 };

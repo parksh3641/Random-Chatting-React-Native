@@ -12,7 +12,7 @@ export default function SplashScreen({ navigation }: { navigation: any }) {
   return (
     <View style={styles.container}>
       <Image source={require('./assets/logo.png')} style={styles.logo} />
-      <Text style={styles.title}>Welcome to Random Chatting!</Text>
+      <Text style={styles.title}>Chat & Play</Text>
     </View>
   );
 }
